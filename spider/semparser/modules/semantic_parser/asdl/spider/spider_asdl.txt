@@ -1,0 +1,90 @@
+# Copyright (c) 2020-present, Royal Bank of Canada.
+# All rights reserved.
+#
+# This source code is licensed under the license found in the
+# LICENSE file in the root directory of this source tree.
+#
+
+# Uncovered Cases:
+# 
+# 1. Multiple Intersect/Union/Except keywords (only one supported)
+# 2. Self-join or cross-join (only inner join with 'ON' keyword supported)
+# 3. Nested query in 'FROM' clause
+# 4. Miss keywork 'DISTINCT'
+#
+
+# define primitive fields
+col_id
+
+# define grammar
+stmt = Intersect(query_expr lbody, query_expr rbody)
+     | Union(query_expr lbody, query_expr rbody)
+     | Except(query_expr lbody, query_expr rbody)
+     | SingleQuery(query_expr body)
+
+query_expr = Query(sel_expr sel_val, from_expr? from_val, where_expr? where_val, having_expr? having_val, orderBy_expr? orderBy_val, groupBy_expr? groupBy_val)
+
+sel_expr = Select(sel_col* sel_col_val)
+
+sel_col = SelectCol(agg_op agg_op_val, val_unit val_unit_val)
+
+from_expr = From(from_cond_expr* from_cond_val)
+from_cond_expr = FromCond(col_unit col_unit_val1, col_unit col_unit_val2)
+
+cond_expr = And(cond_expr cond_val1, cond_expr cond_val2)
+  | Or(cond_expr cond_val1, cond_expr cond_val2)
+  | Less(val_unit val_unit_val)
+  | NestedLess(val_unit val_unit_val, query_expr body)
+  | Greater(val_unit val_unit_val)
+  | NestedGreater(val_unit val_unit_val, query_expr body)
+  | Equal(val_unit val_unit_val)
+  | NestedEqual(val_unit val_unit_val, query_expr body)
+  | LessEqual(val_unit val_unit_val)
+  | NestedLessEqual(val_unit val_unit_val, query_expr body)
+  | GreaterEqual(val_unit val_unit_val)
+  | NestedGreaterEqual(val_unit val_unit_val, query_expr body)
+  | Inequal(val_unit val_unit_val)
+  | NestedInequal(val_unit val_unit_val, query_expr body)
+  | Between(val_unit val_unit_val)
+  | Like(val_unit val_unit_val)
+  | NotLike(val_unit val_unit_val)
+  | In(val_unit val_unit_val, query_expr body)
+  | NotIn(val_unit val_unit_val, query_expr body)
+
+val_unit = ValUnit(col_unit col_unit_val1)
+  | ValUnitMinus(col_unit col_unit_val1, col_unit col_unit_val2)
+  | ValUnitPlus(col_unit col_unit_val1, col_unit col_unit_val2)
+
+col_unit = ColUnit(agg_op agg_op_val, col_id col_id_val)
+
+where_expr = Where(cond_expr cond_val)
+
+having_expr = Having(cond_expr cond_val)
+
+orderBy_expr = Order(order_op order_op_val, val_unit* val_unit_val)
+  | Superlative(order_op order_op_val, val_unit* val_unit_val)
+
+groupBy_expr = GroupBy(col_unit* col_unit_val)
+
+agg_op = none | max | min | count | sum | avg
+
+order_op = desc | asc
+
+# val: number(float)/string(str)/sql(dict)/col_unit
+# col_unit: (agg_id, col_id, isDistinct(bool))
+# val_unit: (unit_op, col_unit1, col_unit2)
+# table_unit: (table_type, col_id/sql)
+# cond_unit: (not_op, op_id, val_unit, val1, val2)
+# condition: [cond_unit1, 'and'/'or', cond_unit2, ...]
+# sql {
+#   'select': (isDistinct(bool), [(agg_id, val_unit), (agg_id, val_unit), ...])
+#   'from': {'table_units': [table_unit1, table_unit2, ...], 'conds': condition}
+#   'where': condition
+#   'groupBy': [col_unit1, col_unit2, ...]
+#   'orderBy': ('asc'/'desc', [val_unit1, val_unit2, ...])
+#   'having': condition
+#   'limit': None/limit value
+#   'intersect': None/sql
+#   'except': None/sql
+#   'union': None/sql
+# }

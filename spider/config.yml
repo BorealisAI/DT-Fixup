@@ -1,0 +1,133 @@
+# Copyright (c) 2020-present, Royal Bank of Canada.
+# All rights reserved.
+#
+# This source code is licensed under the license found in the
+# LICENSE file in the root directory of this source tree.
+#
+
+EXP_DIR: tmp/dtfixup
+
+PREPROCESSOR:
+  REGISTERED_NAME: rat_new_sl
+  REGISTERED_KIND: preprocessor
+  CALL_REQUIRED: True
+  raw_train_data: spider/train_spider.json
+  raw_dev_data: spider/dev.json
+  raw_schema: spider/tables.json
+  schema_with_meta: spider/tables_with_db_meta.json
+  database_folder: spider/database
+  train_data_path: spider/rat_train.bin
+  dev_data_path: spider/rat_dev.bin
+  concept_net_folder: concept_net
+  wordnet_synonyms_for_table_and_column: True
+  use_temporal_result: True
+  use_entity_result: False
+  use_alter_names: True
+  use_db_value: True
+  token_type_norm: True
+
+  transition_system:
+    REGISTERED_NAME: spider
+    REGISTERED_KIND: transition_system
+    CALL_REQUIRED: True
+    grammar:
+      REGISTERED_NAME: asdl
+      REGISTERED_KIND: grammar
+      CALL_REQUIRED: True
+      grammar_path: semparser/modules/semantic_parser/asdl/spider/spider_asdl.txt
+
+MODEL:
+  REGISTERED_NAME: encoder-decoder-parser
+  REGISTERED_KIND: model
+  CALL_REQUIRED: True
+  encoder:
+    REGISTERED_NAME: rat-bert
+    REGISTERED_KIND: encoder
+    CALL_REQUIRED: True
+    hidden_size: 256
+    src_dropout: 0.6
+    schema_dropout: 0.6
+    header_dropout: 0.0
+    col_encodings_dropout: 0.0
+    trans_dropout: 0.0
+    col_tbl_feat_agg: 'avg+last'
+    freeze_bert: False
+    h_layer_from_bottom: False
+    bert_out_n: 1
+    bert_out_h: 1
+    num_layers_rat: 24
+    dt_fix: '{EXP_RUNNER/optimizer/dt_fix}'
+    shuffle_tabs_cols: True
+    pretrained_encoder_type: 'roberta-large'
+    device: '{EXP_RUNNER/device}'
+  decoder:
+    REGISTERED_NAME: parent-feed-lstm
+    REGISTERED_KIND: decoder
+    CALL_REQUIRED: True
+    enc_dim: '{MODEL/encoder/hidden_size}'
+    col_dim: '{MODEL/encoder/hidden_size}'
+    act_dim: 128
+    type_dim: 128
+    rnn_dim: 512
+    attn_dim: 256
+    label_smoothing: 0.2
+    att_dropout: 0.6
+    input_dropout: 0.0
+    prod_temp: 1.0
+    col_temp: 1.0
+    col_sel_weight: 3
+    beam_size: 5
+    max_decode_step: 100
+    device: '{EXP_RUNNER/device}'
+    transition_system: '{PREPROCESSOR/transition_system}'
+
+EXP_RUNNER:
+  REGISTERED_NAME: base
+  REGISTERED_KIND: trainer
+  CALL_REQUIRED: True
+  max_epochs: 100
+  valid_per_epoch: 1
+  log_per_step: 10
+  batch_size: 32
+  small_bsz: 4
+  eval_after_epoch: 60
+  anneal_max_epoch: 100
+  random_seed: 505
+  device: cuda
+
+  exp_path: '{EXP_DIR}'
+
+  train_data:
+    REGISTERED_NAME: base
+    REGISTERED_KIND: dataloader
+    CALL_REQUIRED: True
+    file_path: '{PREPROCESSOR/train_data_path}'
+
+  dev_data:
+    REGISTERED_NAME: base
+    REGISTERED_KIND: dataloader
+    CALL_REQUIRED: True
+    file_path: '{PREPROCESSOR/dev_data_path}'
+
+  evaluator:
+    REGISTERED_NAME: spider-action-evaluator
+    REGISTERED_KIND: evaluator
+    CALL_REQUIRED: True
+    transition_system: '{PREPROCESSOR/transition_system}'
+    eval_top_pred_only: True
+    for_inference: False
+
+  optimizer:
+    REGISTERED_NAME: bot
+    REGISTERED_KIND: optimizer
+    CALL_REQUIRED: True
+    lr: 0.0005
+    clip_grad: 5.0
+    warmup_step: 0
+    anneal_max_step: 30000
+    anneal_power: 0.5
+    min_lr: 0.00001
+    bert_lr_factor: 0.008
+    num_layers_rat: '{MODEL/encoder/num_layers_rat}'
+    dt_fix: True
+    glorot_init: True
