@@ -14,6 +14,9 @@ from yaml import Loader
 import time
 import argparse
 
+import os
+os.environ['CUDA_VISIBLE_DEVICES'] = 0
+
 
 def create_logger(exp_dir):
     log_path = os.path.join(exp_dir, 'logs')
